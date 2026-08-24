@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Render output (the examples/ folder holds the curated renders)
+stencil.svg
+stencil.png
+stencil-*.png

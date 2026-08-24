@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 400">
+  <!-- organic totem-ish blobby figure -->
+  <g fill="#000">
+    <path d="M100 20 Q130 30 122 70 Q160 90 150 140 Q185 170 165 220
+             Q190 260 160 300 Q175 340 140 360 Q120 390 100 375
+             Q80 390 60 360 Q25 340 40 300 Q10 260 35 220
+             Q15 170 50 140 Q40 90 78 70 Q70 30 100 20 Z"/>
+    <circle cx="70" cy="120" r="18"/>
+    <circle cx="135" cy="180" r="22"/>
+    <circle cx="75" cy="250" r="16"/>
+    <circle cx="120" cy="320" r="20"/>
+  </g>
+</svg>

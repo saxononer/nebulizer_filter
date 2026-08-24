@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 400">
+  <!-- simple standing human silhouette -->
+  <g fill="#000">
+    <!-- head -->
+    <circle cx="100" cy="45" r="28"/>
+    <!-- torso -->
+    <path d="M60 85 Q100 70 140 85 L150 200 Q100 220 50 200 Z"/>
+    <!-- left arm -->
+    <path d="M58 95 Q30 130 38 190 Q50 200 60 190 Q52 140 74 105 Z"/>
+    <!-- right arm -->
+    <path d="M142 95 Q170 130 162 190 Q150 200 140 190 Q148 140 126 105 Z"/>
+    <!-- left leg -->
+    <path d="M62 210 Q58 300 66 380 Q80 388 90 380 Q86 300 92 215 Z"/>
+    <!-- right leg -->
+    <path d="M138 210 Q142 300 134 380 Q120 388 110 380 Q114 300 108 215 Z"/>
+  </g>
+</svg>
