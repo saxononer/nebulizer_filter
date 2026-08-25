@@ -1,13 +1,13 @@
-# nebulizer
+# 👽 Nebulizer Filter
 
-Image → single-color SVG stencil: a grid of dots joined by concave
-pinch-bridges, ready to cut or spray.
+Simple python script to turn png inputs into 'nebulized' svgs.
+By Saxon & Hypatia [Qwen3.8, Hermes]
 
 Dark areas of the photo become **big nodes**, light areas become
 **small nodes**, and diagonal neighbors are linked by bridges with a
 probability derived from the luminance of the gap between them.
 
-## Examples
+## ⚡️ Examples
 
 All three rendered from the same input (`examples/Hermes.jpg`),
 default parameters, seed 41 — only the grid resolution changes.
@@ -16,23 +16,24 @@ default parameters, seed 41 — only the grid resolution changes.
 |---|---|---|---|
 | nodes | 50 | 450 | 1800 |
 | bridges | 10 | 160 | 618 |
-| render | [grid10/preview.png](examples/grid10/preview.png) | [grid30/preview.png](examples/grid30/preview.png) | [grid60/preview.png](examples/grid60/preview.png) |
+| render | <img src="examples/grid10.png" width="200" height="200" />| <img src="examples/grid30.png" width="200" height="200" /> | <img src="examples/grid60.png" width="200" height="200" /> |
 
-The SVGs in each folder (`stencil.svg`) are the vector output — the
-PNGs are just raster previews.
 
-## Install
+## 📦 Install
+
+Simply Download the Python script and run as shown in the 'Usage' section.
+Python Dependancies:
+-Numpy 
+-Pillow
 
 ```bash
 # Arch
-sudo pacman -S python-numpy python-pillow librsvg2-bin
+sudo pacman -S python-numpy python-pillow 
 # Debian/Ubuntu
-sudo apt install python3-numpy python3-pil librsvg2-bin
+sudo apt install python3-numpy python3-pil
 ```
 
-That's all: Python 3 + numpy + Pillow + the `rsvg-convert` binary.
-
-## Usage
+## 👾 Usage
 
 ```bash
 python3 nebulizer.py photo.jpg
@@ -45,10 +46,10 @@ python3 nebulizer.py photo.jpg --out /tmp/my-stencil
 Output: `stencil.svg` (vector, the real product), `stencil.png`
 (full-res preview), `stencil-<time>.png` (small preview).
 
-## Parameters
+## ⚙️ Parameters
 
-- `--cols / --rows` — grid size (default 20×20). Nodes sit on a
-  checkerboard (every other cell).
+- `--cols / --rows` — grid size (default 20). Nodes sit on a
+  checkerboard (every other cell). If only either is specified, other dimension is caculated of input, to maintain result aspect ratio.
 - `--spacing` — grid spacing in SVG units (default 18).
 - `--rad-min / --rad-max` — node radius range (default 5–11).
 - `--size-noise` — seeded per-node radius jitter, ± (default 1.0).
@@ -59,12 +60,11 @@ Output: `stencil.svg` (vector, the real product), `stencil.png`
 - `--gap-half` — half-width (in cells) of the luminance window sampled
   around the shared corner (default 0.5).
 - `--stencil on|off` — stencil-safe bridge rules (default on).
-- `--stencil-min-skip` — min-size rule strictness (default 2).
+- `--stencil-min-skip` — skip bridges between nodes of size stencil-min-skip from the smallest node size. (default 2).
 - `--seed` — RNG seed. Deterministic: same image + params + seed =
   byte-identical SVG.
-- `--wide / --small` — PNG preview widths (default 4200 / 1400).
 
-## How it works
+## ❓ How it works
 
 1. Load the image, invert luminance (light → small nodes, dark → big).
 2. Place checkerboard nodes; radius = f(cell luminance) + seeded jitter.
@@ -83,22 +83,16 @@ Bridge geometry is two mirrored quarter-circle cubic Beziers with a
 45° centerline cut, decoded from an Illustrator reference
 (`examples/reference.svg`) to < 0.1 unit.
 
-### Stencil guarantee, honestly stated
+### 💊 Stencil guarantee, honestly stated
 
 The no-pocket rule is a **hard guarantee at low-to-mid density**
-(≈ up to 20×20 on a typical portrait): no enclosed white pockets,
+(≈ up to 20×20 on a typical square portrait): no enclosed white pockets,
 verified by pixel flood-fill. At high density (30×30 and up) the node
 fills themselves overlap and can seal off *tiny* pockets (a few at
 30×30, ~a dozen at 60×60) that the 4-bridge rule can't see. For
 physical stencils those are usually harmless — the spray wicks into a
 few-pixel gap and the shape stays one island — but know they exist.
 
-## Repo layout
+## 📃 License
 
-- `nebulizer.py` — the whole tool
-- `examples/` — input image, reference geometry, example renders
-- `archive/` — earlier prototype scripts (metaball/raster lineage)
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+GNU GPL — see [LICENSE](LICENSE).

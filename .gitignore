@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+archive
 
 # Render output (the examples/ folder holds the curated renders)
 stencil.svg

@@ -22,27 +22,24 @@ Pipeline
   3.  For each diagonal node pair, roll a seeded coin with probability
       mapped from gap luminance; optionally reject the bridge if it
       violates the stencil rules.
-  4.  Emit one <path> per node and per bridge into a single SVG.
-  5.  Rasterize with rsvg-convert (full-res + a smaller preview).
+  4.  Emit one <path> per node and per bridge into a single SVG,
+      written to the current directory as
+      nebulized_<input file name>.svg.
 
-Dependencies: Python 3, numpy, Pillow, and the `rsvg-convert` binary
-(Debian/Arch: librsvg2-bin).
+Dependencies: Python 3, numpy, Pillow.
 
 Usage
 -----
   python3 nebulizer.py photo.jpg
   python3 nebulizer.py photo.jpg --cols 30 --rows 30 --seed 7
   python3 nebulizer.py photo.jpg --stencil off --p-max 0.8
-  python3 nebulizer.py photo.jpg --out /tmp/my-stencil
 
 Deterministic: same image + same params + same seed = identical output.
 """
 import argparse
 import os
 import random
-import subprocess
 import sys
-from datetime import datetime
 
 import numpy as np
 from PIL import Image
@@ -51,7 +48,8 @@ from PIL import Image
 # Parameters (defaults; all overridable via CLI flags)
 # ──────────────────────────────────────────────────────────────────────────
 SPACING = 18.0              # grid spacing, SVG units
-COLS, ROWS = 20, 20         # grid size (checkerboard nodes on even-parity cells)
+COLS, ROWS = 20, 20         # fallback grid size when no dimension is given
+                            # (only ROWS is used then; COLS derives from aspect)
 RAD_MIN, RAD_MAX = 5.0, 11.0
 SIZE_NOISE = 1.0            # per-node radius jitter, +/- (seeded, clamped)
 SEED = 41
@@ -63,8 +61,6 @@ GAP_HALF = 0.5              # half-window (in cells) around the shared corner
 STENCIL_MODE = True         # ON: enforce stencil-safe bridge rules; OFF: free
 STENCIL_MIN_SKIP = 2        # bridges forbidden while a node is within this many
                             # radius-steps above RAD_MIN (step = (RAD_MAX-RAD_MIN)/ROWS)
-RENDER_WIDE = 4200          # full-res PNG width
-RENDER_SMALL = 1400         # preview PNG width
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -326,10 +322,10 @@ def main(argv=None):
         description="Raster image -> single-color SVG stencil "
                     "(checkerboard nodes + probabilistic diagonal bridges).")
     ap.add_argument("image", help="input image (any format Pillow reads)")
-    ap.add_argument("--out", default=None,
-                    help="output directory (default: <image dir>/stencil-out)")
-    ap.add_argument("--cols", type=int, default=COLS)
-    ap.add_argument("--rows", type=int, default=ROWS)
+    ap.add_argument("--cols", type=int, default=None,
+                    help="grid columns (default: derived from image aspect ratio)")
+    ap.add_argument("--rows", type=int, default=None,
+                    help="grid rows (default: derived from image aspect ratio)")
     ap.add_argument("--spacing", type=float, default=SPACING)
     ap.add_argument("--rad-min", type=float, default=RAD_MIN)
     ap.add_argument("--rad-max", type=float, default=RAD_MAX)
@@ -347,59 +343,54 @@ def main(argv=None):
                     default="on" if STENCIL_MODE else "off",
                     help="stencil-safe bridge rules (default: on)")
     ap.add_argument("--stencil-min-skip", type=int, default=STENCIL_MIN_SKIP)
-    ap.add_argument("--wide", type=int, default=RENDER_WIDE,
-                    help="full-res PNG width")
-    ap.add_argument("--small", type=int, default=RENDER_SMALL,
-                    help="preview PNG width")
     args = ap.parse_args(argv)
 
-    p = dict(spacing=args.spacing, cols=args.cols, rows=args.rows,
+    # 1. luminance, inverted: light -> small (negative space), dark -> large
+    im = Image.open(args.image).convert("L")
+    lum = 1.0 - np.array(im, dtype=np.float64) / 255.0
+
+    # Grid size: explicit --cols/--rows win (they may distort the aspect
+    # ratio on purpose). Otherwise the missing dimension is derived from
+    # the image aspect ratio so the SVG keeps the photo's proportions.
+    cols, rows = args.cols, args.rows
+    if cols is None and rows is None:
+        rows = COLS
+    if cols is None:
+        cols = max(1, round(rows * im.width / im.height))
+    if rows is None:
+        rows = max(1, round(cols * im.height / im.width))
+
+    p = dict(spacing=args.spacing, cols=cols, rows=rows,
              rad_min=args.rad_min, rad_max=args.rad_max,
              size_noise=args.size_noise, border_radius=args.border_radius,
              p_min=args.p_min, p_max=args.p_max, bridge_noise=args.bridge_noise,
              gap_half=args.gap_half, stencil=(args.stencil == "on"),
              stencil_min_skip=args.stencil_min_skip)
 
-    outdir = args.out or os.path.join(os.path.dirname(os.path.abspath(args.image)),
-                                      "stencil-out")
-    os.makedirs(outdir, exist_ok=True)
-
-    # 1. luminance, inverted: light -> small (negative space), dark -> large
-    im = Image.open(args.image).convert("L")
-    lum = 1.0 - np.array(im, dtype=np.float64) / 255.0
-
     rng = random.Random(args.seed)
 
     # 2. + 3. nodes, then probabilistic bridges
-    nodes = build_nodes(lum, args.cols, args.rows, rng, p)
-    bridges, rolls = build_bridges(lum, nodes, args.cols, args.rows, rng, p)
+    nodes = build_nodes(lum, cols, rows, rng, p)
+    bridges, rolls = build_bridges(lum, nodes, cols, rows, rng, p)
 
-    # 4. SVG
+    # 4. SVG — single file in the current directory: nebulized_<input>.svg
     svg = render_svg(nodes, bridges, p)
-    svgp = os.path.join(outdir, "stencil.svg")
+    base = os.path.splitext(os.path.basename(args.image))[0]
+    svgp = os.path.join(os.getcwd(), f"nebulized_{base}.svg")
     with open(svgp, "w") as f:
         f.write(svg)
 
-    # 5. PNGs (rsvg-convert required)
-    stamp = f"{datetime.now():%H%M%S}"
-    pngp = os.path.join(outdir, "stencil.png")
-    png_small = os.path.join(outdir, f"stencil-{stamp}.png")
-    subprocess.run(["rsvg-convert", "-w", str(args.wide), svgp, "-o", pngp], check=True)
-    subprocess.run(["rsvg-convert", "-w", str(args.small), svgp, "-o", png_small], check=True)
-
     all_r = [n[2] for n in nodes.values()]
-    a = np.array(Image.open(pngp).convert("L"))
+    a = np.array(im)
     ps = [pr for pr, _ in rolls]
-    print(f"nodes={len(nodes)} ({args.cols}x{args.rows} checkerboard)  "
+    print(f"nodes={len(nodes)} ({cols}x{rows} checkerboard)  "
           f"bridges={len(bridges)}/{len(rolls)}")
     print(f"r range=[{min(all_r):.2f},{max(all_r):.2f}] (clamped to RAD_MAX={args.rad_max})")
     print(f"bridge prob: {args.p_min:.0%}..{args.p_max:.0%} linear "
           f"+/-{args.bridge_noise:.2f} noise, realized mean={np.mean(ps):.2f}")
     print(f"stencil: {'ON (no-4-node-pocket + min-size rules)' if p['stencil'] else 'OFF'}")
-    print(f"blackpx={(a < 128).sum()}")
+    print(f"source darkpx={(a < 128).sum()}")
     print(f"-> {svgp}")
-    print(f"-> {pngp} (full res)")
-    print(f"-> {png_small} (preview)")
 
 
 if __name__ == "__main__":
